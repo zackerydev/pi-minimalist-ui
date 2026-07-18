@@ -24,15 +24,15 @@ The editor frame is inspired by [Jan-Oliver Jahner's original `simple` theme for
 
 ## Installation
 
-Review the source, then install the tagged release:
+Review the source, then install the latest release from npm:
 
 ```bash
-pi install git:github.com/zackerydev/pi-minimalist-ui@v0.1.0
+pi install npm:pi-minimalist-ui
 ```
 
-Pi stores Git packages in its managed package directory and registers them in Pi settings. It does not copy files into `~/.pi/agent/extensions/` or modify project source code.
+Pi stores npm packages in its managed package directory and registers them in Pi settings. It does not copy files into `~/.pi/agent/extensions/` or modify project source code.
 
-To follow the latest development version instead, omit `@v0.1.0`.
+To pin this release, use `pi install npm:pi-minimalist-ui@0.1.1`.
 
 ## Compatibility
 
