@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">pi-minimalist-ui terminal preview</title>
+  <desc id="description">A dark terminal showing a concise Pi conversation and the minimalist editor frame.</desc>
+  <rect width="1200" height="630" fill="#090b0f"/>
+  <rect x="35" y="28" width="1130" height="574" rx="18" fill="#12151b" stroke="#2b313c" stroke-width="2"/>
+
+  <circle cx="70" cy="62" r="7" fill="#ff6b6b"/>
+  <circle cx="94" cy="62" r="7" fill="#ffd166"/>
+  <circle cx="118" cy="62" r="7" fill="#56d364"/>
+  <text x="600" y="69" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" text-anchor="middle">pi · minimalist ui</text>
+  <line x1="35" y1="91" x2="1165" y2="91" stroke="#242a33" stroke-width="2"/>
+
+  <text x="76" y="145" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">you</text>
+  <text x="76" y="181" fill="#d8dee9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">Make the public release simple, clean, and trustworthy.</text>
+
+  <text x="76" y="242" fill="#79c0ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">pi</text>
+  <text x="76" y="278" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="21">The checks pass. The package is small, typed, tested, and ready to inspect.</text>
+  <text x="76" y="328" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">✓ tests</text>
+  <text x="205" y="328" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">✓ types</text>
+  <text x="334" y="328" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">✓ package</text>
+
+  <path d="M76 410 H1124 M76 410 V540 M1124 410 V540 M76 540 H1124" fill="none" stroke="#596273" stroke-width="2"/>
+  <rect x="95" y="394" width="325" height="32" fill="#12151b"/>
+  <text x="105" y="417" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">pi-minimalist-ui</text>
+  <text x="307" y="417" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">(</text>
+  <text x="320" y="417" fill="#d2a8ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">main</text>
+  <text x="365" y="417" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">✓</text>
+  <text x="385" y="417" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">)</text>
+
+  <rect x="1000" y="394" width="100" height="32" fill="#12151b"/>
+  <text x="1013" y="417" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">✓12</text>
+
+  <text x="101" y="486" fill="#f0f3f6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="23">Ship it with confidence.</text>
+  <rect x="390" y="461" width="13" height="30" fill="#d8dee9" opacity="0.9"/>
+
+  <rect x="836" y="524" width="264" height="32" fill="#12151b"/>
+  <text x="850" y="547" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">gpt-5.6 · medium</text>
+
+  <text x="600" y="582" fill="#596273" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" text-anchor="middle">project · git · tools · model · thinking</text>
+</svg>
