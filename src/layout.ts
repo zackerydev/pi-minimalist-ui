@@ -16,8 +16,12 @@ export function addSideBorders(line: string, width: number, border: (text: strin
 
 	const innerWidth = width - 2;
 	let inner = line.slice(start, end);
-	if (visibleWidth(inner) > innerWidth) inner = truncateToWidth(inner, innerWidth, "…");
-	inner += " ".repeat(Math.max(0, innerWidth - visibleWidth(inner)));
+	let contentWidth = visibleWidth(inner);
+	if (contentWidth > innerWidth) {
+		inner = truncateToWidth(inner, innerWidth, "…");
+		contentWidth = visibleWidth(inner);
+	}
+	inner += " ".repeat(Math.max(0, innerWidth - contentWidth));
 	return border("│") + inner + border("│");
 }
 
@@ -32,13 +36,21 @@ export function addBorderLabels(
 
 	const innerWidth = width - 2;
 	let right = rightLabel && width >= 8 ? ` ${rightLabel} ` : "";
-	if (visibleWidth(right) > innerWidth) right = truncateToWidth(right, innerWidth, "…");
+	let rightWidth = visibleWidth(right);
+	if (rightWidth > innerWidth) {
+		right = truncateToWidth(right, innerWidth, "…");
+		rightWidth = visibleWidth(right);
+	}
 
-	const leftWidth = innerWidth - visibleWidth(right);
+	const leftWidth = innerWidth - rightWidth;
 	let left = leftLabel && width >= 8 ? ` ${leftLabel} ` : "";
-	if (visibleWidth(left) > leftWidth) left = truncateToWidth(left, leftWidth, "…");
+	let labelWidth = visibleWidth(left);
+	if (labelWidth > leftWidth) {
+		left = truncateToWidth(left, leftWidth, "…");
+		labelWidth = visibleWidth(left);
+	}
 
-	const fillWidth = innerWidth - visibleWidth(left) - visibleWidth(right);
+	const fillWidth = innerWidth - labelWidth - rightWidth;
 	return border("┌") + left + border("─".repeat(fillWidth)) + right + border("┐");
 }
 
@@ -48,7 +60,11 @@ export function addBottomLabel(width: number, label: string, border: (text: stri
 
 	const innerWidth = width - 2;
 	let right = label && width >= 8 ? ` ${label} ` : "";
-	if (visibleWidth(right) > innerWidth) right = truncateToWidth(right, innerWidth, "…");
-	const fillWidth = innerWidth - visibleWidth(right);
+	let rightWidth = visibleWidth(right);
+	if (rightWidth > innerWidth) {
+		right = truncateToWidth(right, innerWidth, "…");
+		rightWidth = visibleWidth(right);
+	}
+	const fillWidth = innerWidth - rightWidth;
 	return border("└") + border("─".repeat(fillWidth)) + right + border("┘");
 }

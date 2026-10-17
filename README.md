@@ -13,7 +13,7 @@ The editor frame is inspired by [Jan-Oliver Jahner's original `simple` theme for
 - Clears the terminal viewport when Pi starts
 - Project name, Git branch, and working-tree status inside the prompt box
 - Thinking/working shows as a simple spinner
-- Tightly stacked, single-line summaries for read, bash, edit, write, grep, find, and ls
+- Tightly stacked, single-line summaries for built-in tools, MCP tools, and `codemode` / tool discovery
 - Dimmed `›` user prompts without background blocks
 - Compact abort notices without surrounding blank rows
 - Full tool output, diffs, and inline images remain available when expanded (`C-o`)
@@ -32,14 +32,14 @@ pi install npm:pi-minimalist-ui
 
 Pi stores npm packages in its managed package directory and registers them in Pi settings. It does not copy files into `~/.pi/agent/extensions/` or modify project source code.
 
-To pin this release, use `pi install npm:pi-minimalist-ui@0.1.1`.
+To pin this release, use `pi install npm:pi-minimalist-ui@0.1.2`.
 
 ## Compatibility
 
 - Node.js 22.19 or newer
 - Pi with extension package support
 
-The extension uses Pi's public extension APIs and declares Pi's bundled core packages as peers. Development and release checks currently run against Pi 0.80.7.
+The extension uses Pi's public extension APIs and declares Pi's bundled core packages as peers. Development and release checks currently run against Pi 1.3.0.
 
 ## Development
 
@@ -62,6 +62,14 @@ pi -e .            # one-off test without changing Pi settings
 pi remove "$PWD"  # remove the local package reference
 ```
 
+## Performance
+
+Tool-completion bursts share a trailing 250 ms Git refresh rather than spawning Git for every tool. Run completion refreshes immediately, and shutdown cancels pending work. During a burst, Git metadata can briefly lag behind tool results.
+
+Unchanged tool rows cache their most recent width and rendered output. Text updates, resizing, and invalidation rebuild the cache; each row retains only one layout. Border helpers avoid redundant terminal-width measurements, and line counting avoids per-line arrays.
+
+Run `npm run bench` for a reproducible warm-cache tool-layout microbenchmark. It compares the previous uncached layout with cached layout at the same width and verifies identical output. It does not measure end-to-end Pi performance or cold renders.
+
 ## Structure
 
 ```text
@@ -72,8 +80,9 @@ src/layout.ts         terminal-safe frame helpers
 src/layout.test.ts    layout width regressions
 src/messages.ts       compact user and abort message rendering
 src/messages.test.ts  message rendering regressions
-src/tools.ts          compact built-in tool renderers
-src/tools.test.ts     tool rendering regressions
+src/tools.ts          compact built-in and MCP tool renderers
+src/tools.test.ts     built-in tool rendering regressions
+src/mcp-tools.test.ts MCP, codemode, and discovery rendering regressions
 dist/                 generated release output
 ```
 

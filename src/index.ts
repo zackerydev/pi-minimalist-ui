@@ -5,7 +5,7 @@ import { truncateToWidth, type Component, type EditorTheme, type TUI } from "@ea
 
 import { addBorderLabels, addBottomLabel, addSideBorders, sanitizeTerminalText } from "./layout.js";
 import { compactMessages } from "./messages.js";
-import { registerCompactTools, removeToolSpacing } from "./tools.js";
+import { registerCompactMcpRenderers, registerCompactTools, removeToolSpacing } from "./tools.js";
 
 class EmptyFooter implements Component {
 	render(): string[] {
@@ -22,6 +22,7 @@ function isHorizontalBorder(line: string): boolean {
 
 export default function minimalistUi(pi: ExtensionAPI) {
 	registerCompactTools(pi);
+	registerCompactMcpRenderers(pi);
 	const restoreToolSpacing = removeToolSpacing();
 
 	let tui: TUI | undefined;
@@ -34,6 +35,7 @@ export default function minimalistUi(pi: ExtensionAPI) {
 	let refreshPending = false;
 	let pendingCwd: string | undefined;
 	let gitAbortController: AbortController | undefined;
+	let gitRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 	let stopped = false;
 	let clearTerminalOnEditorMount = false;
 	let working = false;
@@ -98,6 +100,20 @@ export default function minimalistUi(pi: ExtensionAPI) {
 		}
 	};
 
+	const cancelScheduledGitRefresh = () => {
+		if (gitRefreshTimer) clearTimeout(gitRefreshTimer);
+		gitRefreshTimer = undefined;
+	};
+
+	const scheduleGitRefresh = (cwd: string) => {
+		if (stopped) return;
+		cancelScheduledGitRefresh();
+		gitRefreshTimer = setTimeout(() => {
+			gitRefreshTimer = undefined;
+			void refreshGit(cwd);
+		}, 250);
+	};
+
 	pi.on("agent_start", (_event, ctx) => {
 		ctx.ui.setWorkingVisible(false);
 		succeeded = 0;
@@ -110,11 +126,13 @@ export default function minimalistUi(pi: ExtensionAPI) {
 		if (event.isError) failed++;
 		else succeeded++;
 		tui?.requestRender();
-		void refreshGit(ctx.cwd);
+		scheduleGitRefresh(ctx.cwd);
 	});
 
-	pi.on("agent_end", () => {
+	pi.on("agent_end", (_event, ctx) => {
 		stopSpinner();
+		cancelScheduledGitRefresh();
+		void refreshGit(ctx.cwd);
 	});
 
 	pi.on("message_start", (_event, ctx) => {
@@ -189,6 +207,7 @@ export default function minimalistUi(pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", () => {
 		stopped = true;
+		cancelScheduledGitRefresh();
 		restoreMessages?.();
 		restoreMessages = undefined;
 		restoreToolSpacing();

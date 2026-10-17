@@ -38,12 +38,14 @@ function renderContext(
 		args,
 		argsComplete: true,
 		cwd: "/tmp/example",
+		durationMs: undefined,
 		executionStarted: true,
 		expanded: false,
 		invalidate: vi.fn(),
 		isError: false,
 		isPartial: true,
 		lastComponent: undefined,
+		outputPad: 0,
 		showImages: true,
 		state,
 		toolCallId: "tool-1",
@@ -130,6 +132,38 @@ describe("compact tool rendering", () => {
 			expect(lines, name).toHaveLength(1);
 			expect(visibleWidth(lines[0] ?? ""), name).toBeLessThanOrEqual(24);
 		}
+	});
+
+	test("caches line layout until width, text, or invalidation changes", () => {
+		const tool = createTools().get("bash")!;
+		const args = calls.bash;
+		const state = {};
+		const call = tool.renderCall!(args, theme, renderContext(args, state));
+		const first = call.render(80);
+		expect(call.render(80)).toBe(first);
+
+		tool.renderResult!(
+			{ content: [{ type: "text", text: "done" }], details: undefined },
+			{ expanded: false, isPartial: true },
+			theme,
+			renderContext(args, state),
+		);
+		expect(call.render(80)).toBe(first);
+
+		const narrow = call.render(8);
+		expect(narrow).not.toBe(first);
+		expect(visibleWidth(narrow[0] ?? "")).toBeLessThanOrEqual(8);
+		call.invalidate();
+		expect(call.render(8)).not.toBe(narrow);
+
+		tool.renderResult!(
+			{ content: [{ type: "text", text: "done" }], details: undefined },
+			{ expanded: false, isPartial: false },
+			theme,
+			renderContext(args, state, { isPartial: false }),
+		);
+		expect(call.render(80)).toEqual(["✓ bash npm test"]);
+		expect(call.render(0)).toEqual([]);
 	});
 
 	test("summarizes a write without rendering its content", () => {

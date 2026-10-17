@@ -38,17 +38,28 @@ type ToolFactory<TParams extends TSchema, TDetails, TState> = (
 ) => ToolDefinition<TParams, TDetails, TState>;
 
 class SingleLine implements Component {
+	private cachedWidth: number | undefined;
+	private cachedLines: string[] = [];
+
 	constructor(private text: string) {}
 
 	setText(text: string): void {
+		if (text === this.text) return;
 		this.text = text;
+		this.invalidate();
 	}
 
 	render(width: number): string[] {
-		return width > 0 ? [truncateToWidth(this.text, width, "…")] : [];
+		if (width !== this.cachedWidth) {
+			this.cachedLines = width > 0 ? [truncateToWidth(this.text, width, "…")] : [];
+			this.cachedWidth = width;
+		}
+		return this.cachedLines;
 	}
 
-	invalidate(): void {}
+	invalidate(): void {
+		this.cachedWidth = undefined;
+	}
 }
 
 function compactText(value: unknown, fallback = "…"): string {
@@ -65,7 +76,10 @@ function textOutput(result: AgentToolResult<unknown>): string {
 }
 
 function lineCount(text: string): number {
-	return text ? text.split("\n").length : 0;
+	if (!text) return 0;
+	let count = 1;
+	for (let index = text.indexOf("\n"); index !== -1; index = text.indexOf("\n", index + 1)) count++;
+	return count;
 }
 
 function errorSummary(result: AgentToolResult<unknown>): string | undefined {
@@ -106,23 +120,17 @@ function renderLine(
 	return text;
 }
 
-function registerCompactTool<TParams extends TSchema, TDetails, TState>(
-	pi: ExtensionAPI,
-	factory: ToolFactory<TParams, TDetails, TState>,
+function compactRenderers<TParams extends TSchema, TDetails>(
+	name: string,
 	renderer: CompactRenderer<TParams, TDetails>,
-): void {
-	const original = factory(process.cwd());
-	pi.registerTool<TParams, TDetails, CompactToolState>({
-		...original,
+): Required<Pick<ToolDefinition<TParams, TDetails, CompactToolState>, "renderShell" | "renderCall" | "renderResult">> {
+	return {
 		renderShell: "self",
-		async execute(toolCallId, params, signal, onUpdate, ctx) {
-			return factory(ctx.cwd).execute(toolCallId, params, signal, onUpdate, ctx);
-		},
 		renderCall(args, theme, context) {
 			const line = context.lastComponent instanceof SingleLine ? context.lastComponent : new SingleLine("");
 			context.state.line = line;
 			line.setText(
-				renderLine(original.name, renderer.call(args), theme, {
+				renderLine(name, renderer.call(args), theme, {
 					isError: context.isError,
 					isPartial: context.isPartial,
 				}),
@@ -133,7 +141,7 @@ function registerCompactTool<TParams extends TSchema, TDetails, TState>(
 			const summary = context.isError ? errorSummary(result) : renderer.summary?.(result, context.args);
 			context.state.line?.setText(
 				renderLine(
-					original.name,
+					name,
 					renderer.call(context.args),
 					theme,
 					{ isError: context.isError, isPartial: context.isPartial },
@@ -145,6 +153,55 @@ function registerCompactTool<TParams extends TSchema, TDetails, TState>(
 			const output = renderer.expanded?.(result, context.args, context.isError) ?? expandedText(result);
 			return output ? new Text(styleOutput(output, theme, context.isError), 0, 0) : new Container();
 		},
+	};
+}
+
+function registerCompactTool<TParams extends TSchema, TDetails, TState>(
+	pi: ExtensionAPI,
+	factory: ToolFactory<TParams, TDetails, TState>,
+	renderer: CompactRenderer<TParams, TDetails>,
+): void {
+	const original = factory(process.cwd());
+	pi.registerTool<TParams, TDetails, CompactToolState>({
+		...original,
+		...compactRenderers(original.name, renderer),
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
+			return factory(ctx.cwd).execute(toolCallId, params, signal, onUpdate, ctx);
+		},
+	});
+}
+
+const mcpHelpers = new Set([
+	"codemode",
+	"tool_search",
+	"list_mcp_resources",
+	"list_mcp_resource_templates",
+	"read_mcp_resource",
+]);
+
+function argumentPreview(args: unknown): string {
+	if (args && typeof args === "object") {
+		const values = args as Record<string, unknown>;
+		for (const key of ["url", "path", "filename", "query", "pattern", "ref", "code"]) {
+			if (typeof values[key] === "string" && values[key].trim()) return values[key];
+		}
+	}
+	return JSON.stringify(args) ?? "…";
+}
+
+export function registerCompactMcpRenderers(pi: ExtensionAPI): void {
+	// Resolve by name, not the currently connected tools: resumed sessions and late
+	// MCP connections need the same rendering before their tools are registered.
+	pi.registerToolRenderer((name, next) => {
+		if (!name.startsWith("mcp__") && !mcpHelpers.has(name)) return next();
+		const label = name.startsWith("mcp__") ? name.slice(5).replace("__", ".") : name;
+		return compactRenderers<TSchema, unknown>(label, {
+			call: (args) => ({ subject: argumentPreview(args) }),
+			expanded: (result, args) => {
+				const input = JSON.stringify(args, null, 2);
+				return [input, expandedText(result)].filter(Boolean).join("\n\n");
+			},
+		});
 	});
 }
 

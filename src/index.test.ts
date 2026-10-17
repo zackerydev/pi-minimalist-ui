@@ -48,6 +48,7 @@ function createEditor(
 		getThinkingLevel: () => "off",
 		on: (event: string, handler: EventHandler) => handlers.set(event, handler),
 		registerTool: vi.fn(),
+		registerToolRenderer: vi.fn(),
 	} as unknown as ExtensionAPI;
 
 	minimalistUi(pi);
@@ -86,6 +87,7 @@ describe("minimalist editor", () => {
 		const pi = {
 			on: (event: string, handler: EventHandler) => handlers.set(event, handler),
 			registerTool: vi.fn(),
+			registerToolRenderer: vi.fn(),
 		} as unknown as ExtensionAPI;
 
 		try {
@@ -179,10 +181,42 @@ describe("minimalist editor", () => {
 		});
 
 		await vi.waitFor(() => expect(exec).toHaveBeenCalledTimes(1));
-		handlers.get("tool_execution_end")?.({ isError: false }, context);
+		handlers.get("agent_end")?.({ type: "agent_end" }, context);
 		releaseBranch?.(execResult(0, "main\n"));
 
 		await vi.waitFor(() => expect(exec).toHaveBeenCalledTimes(4));
+	});
+
+	test("coalesces tool bursts and flushes Git state at agent end", async () => {
+		vi.useFakeTimers();
+		try {
+			const { context, exec, handlers } = createEditor(async () => execResult(0, "main\n"));
+			await vi.advanceTimersByTimeAsync(0);
+			expect(exec).toHaveBeenCalledTimes(2);
+
+			for (let index = 0; index < 50; index++) {
+				handlers.get("tool_execution_end")?.({ isError: false }, context);
+			}
+			expect(vi.getTimerCount()).toBe(1);
+			await vi.advanceTimersByTimeAsync(249);
+			expect(exec).toHaveBeenCalledTimes(2);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(exec).toHaveBeenCalledTimes(4);
+
+			handlers.get("tool_execution_end")?.({ isError: false }, context);
+			handlers.get("agent_end")?.({ type: "agent_end" }, context);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(exec).toHaveBeenCalledTimes(6);
+			expect(vi.getTimerCount()).toBe(0);
+
+			handlers.get("tool_execution_end")?.({ isError: false }, context);
+			handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "quit" }, context);
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(exec).toHaveBeenCalledTimes(6);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test("cancels an in-flight Git scan during shutdown", async () => {
@@ -206,7 +240,7 @@ describe("minimalist editor", () => {
 
 			const output = editor.render(60).join("\n");
 			expect(output).toContain("✓1 ✕1");
-			expect(vi.getTimerCount()).toBe(1);
+			expect(vi.getTimerCount()).toBe(2);
 
 			handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "quit" }, context);
 			expect(vi.getTimerCount()).toBe(0);
