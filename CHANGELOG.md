@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [0.1.3] - 2026-10-18
+
+### Fixed
+
+- Remove the stray truncation ellipsis on empty or short input when Pi applies zero editor padding, while retaining the cursor and real overflow indicators.
+
+### Added
+
+- Collapse visible thinking traces into one terminal-width row with a Nerd Font brain icon, `Thinking`, and the opening text. Fullscreen clicks expand or collapse individual traces, while Pi's thinking-visibility toggle still hides them.
+
 ## [0.1.2] - 2026-10-16
 
 ### Fixed
@@ -35,6 +45,7 @@ All notable changes to this project are documented here.
 - Focused regression coverage for editor framing, Git failures, lifecycle cleanup, and unsafe terminal metadata.
 - Automated formatting, type checking, tests, builds, and package validation.
 
+[0.1.3]: https://github.com/zackerydev/pi-minimalist-ui/releases/tag/v0.1.3
 [0.1.2]: https://github.com/zackerydev/pi-minimalist-ui/releases/tag/v0.1.2
 [0.1.1]: https://github.com/zackerydev/pi-minimalist-ui/releases/tag/v0.1.1
 [0.1.0]: https://www.npmjs.com/package/pi-minimalist-ui/v/0.1.0

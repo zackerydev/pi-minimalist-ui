@@ -41,6 +41,13 @@ describe("minimalist UI frame rendering", () => {
 		expect(visibleWidth(addSideBorders("x", 10, border))).toBe(10);
 	});
 
+	test("still marks real content overflow with an ellipsis", () => {
+		const line = addSideBorders(styled("abcdefghijk"), 8, border);
+		expect(line).toContain("abcde");
+		expect(line).toContain("…");
+		expectWidth(line, 8);
+	});
+
 	test("preserves width with graphemes and wide characters", () => {
 		for (let width = 0; width <= 40; width++) {
 			expectWidth(addBorderLabels(width, styled("世界 👩🏽‍💻"), styled("e\u0301"), border), width);

@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { CustomEditor, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, type EditorComponent, type EditorTheme, type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, test, vi } from "vitest";
 
@@ -10,7 +10,7 @@ const execResult = (code: number, stdout = "", stderr = "") => ({ code, killed: 
 interface EditorHarness {
 	clearScreen: ReturnType<typeof vi.fn>;
 	context: ExtensionContext;
-	editor: EditorComponent & { focused: boolean };
+	editor: CustomEditor;
 	exec: ReturnType<typeof vi.fn>;
 	handlers: Map<string, EventHandler>;
 }
@@ -64,7 +64,7 @@ function createEditor(
 	return {
 		clearScreen,
 		context,
-		editor: editorFactory(tui, theme, keybindings) as EditorComponent & { focused: boolean },
+		editor: editorFactory(tui, theme, keybindings) as CustomEditor,
 		exec,
 		handlers,
 	};
@@ -98,6 +98,28 @@ describe("minimalist editor", () => {
 		} finally {
 			if (original === undefined) delete process.env[key];
 			else process.env[key] = original;
+		}
+	});
+
+	test.each([false, true])("does not mark empty or short zero-padding input as truncated (focused: %s)", (focused) => {
+		const { context, editor, handlers } = createEditor();
+		try {
+			editor.focused = focused;
+			// Pi applies its editorPaddingX setting after mounting a custom editor.
+			editor.setPaddingX(0);
+			for (const text of ["", "hello"]) {
+				editor.setText(text);
+				for (const width of [12, 80, 20]) {
+					const rows = editor.render(width).slice(1, -1);
+					const output = rows.join("\n");
+					expect(output).not.toContain("…");
+					if (text) expect(output).toContain(text);
+					if (focused) expect(output).toContain(CURSOR_MARKER);
+					for (const row of rows) expect(visibleWidth(row)).toBe(width);
+				}
+			}
+		} finally {
+			handlers.get("session_shutdown")?.({}, context);
 		}
 	});
 

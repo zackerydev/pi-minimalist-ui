@@ -17,6 +17,11 @@ export function addSideBorders(line: string, width: number, border: (text: strin
 	const innerWidth = width - 2;
 	let inner = line.slice(start, end);
 	let contentWidth = visibleWidth(inner);
+	// With zero editor padding, both border columns must come from trailing blanks.
+	while (contentWidth > innerWidth && inner.endsWith(" ")) {
+		inner = inner.slice(0, -1);
+		contentWidth--;
+	}
 	if (contentWidth > innerWidth) {
 		inner = truncateToWidth(inner, innerWidth, "…");
 		contentWidth = visibleWidth(inner);

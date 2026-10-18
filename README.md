@@ -13,6 +13,7 @@ The editor frame is inspired by [Jan-Oliver Jahner's original `simple` theme for
 - Clears the terminal viewport when Pi starts
 - Project name, Git branch, and working-tree status inside the prompt box
 - Thinking/working shows as a simple spinner
+- Visible thinking traces collapse to a single `󰧑 Thinking — opening text` row, clipped to terminal width
 - Tightly stacked, single-line summaries for built-in tools, MCP tools, and `codemode` / tool discovery
 - Dimmed `›` user prompts without background blocks
 - Compact abort notices without surrounding blank rows
@@ -32,14 +33,16 @@ pi install npm:pi-minimalist-ui
 
 Pi stores npm packages in its managed package directory and registers them in Pi settings. It does not copy files into `~/.pi/agent/extensions/` or modify project source code.
 
-To pin this release, use `pi install npm:pi-minimalist-ui@0.1.2`.
+To pin this release, use `pi install npm:pi-minimalist-ui@0.1.3`.
 
 ## Compatibility
 
 - Node.js 22.19 or newer
 - Pi with extension package support
 
-The extension uses Pi's public extension APIs and declares Pi's bundled core packages as peers. Development and release checks currently run against Pi 1.3.0.
+The extension uses Pi's extension APIs plus small component-rendering patches and declares Pi's bundled core packages as peers. Development and release checks currently run against Pi 1.3.0.
+
+Use a Nerd Font for the brain icon. Thinking previews show the first non-empty line, without Markdown heading or emphasis markers; they do not generate an AI summary. Pi's thinking-visibility toggle still hides these rows. In fullscreen mode, click a thinking row to expand or collapse the full trace. Tool expansion (`C-o`) is unchanged.
 
 ## Development
 

@@ -4,7 +4,7 @@ import {
 	type Theme,
 	UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { Text, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, test } from "vitest";
 
 import { compactMessages } from "./messages.js";
@@ -49,6 +49,25 @@ const toolCallMessage = {
 	stopReason: "toolUse" as const,
 };
 
+function clickThinking(message: AssistantMessageComponent, y = 0): void {
+	message.render(80);
+	expect(
+		message.handleMouse({
+			alt: false,
+			button: "left",
+			ctrl: false,
+			height: 24,
+			screenX: 0,
+			screenY: y,
+			shift: false,
+			type: "click",
+			width: 80,
+			x: 0,
+			y,
+		})?.handled,
+	).toBe(true);
+}
+
 describe("minimal message rendering", () => {
 	test("renders user prompts as one dimmed prefixed line without a background", () => {
 		const restore = compactMessages(theme);
@@ -82,6 +101,156 @@ describe("minimal message rendering", () => {
 		} finally {
 			restore();
 		}
+	});
+
+	test("compacts visible thinking into a brain-icon row using the opening heading", () => {
+		const restore = compactMessages(theme);
+		try {
+			const content = [
+				{ thinking: "\n**Exploring file access methods**\n\nI should inspect the files.", type: "thinking" as const },
+				toolCallMessage.content[1]!,
+			];
+			const original = JSON.stringify(content);
+			const message = new AssistantMessageComponent({ ...toolCallMessage, content });
+			const lines = message.render(80);
+
+			expect(lines.map(plain)).toEqual(["󰧑 Thinking — Exploring file access methods"]);
+			expect(JSON.stringify(content)).toBe(original);
+		} finally {
+			restore();
+		}
+	});
+
+	test("clips thinking to one terminal-safe row at narrow widths and after resizing", () => {
+		const restore = compactMessages(theme);
+		try {
+			const message = new AssistantMessageComponent({
+				...toolCallMessage,
+				content: [{ thinking: "Reviewing 界面 e\u0301 " + "details ".repeat(30), type: "thinking" }],
+			});
+			for (const width of [80, 20, 1, 0, 12, 120]) {
+				const lines = message.render(width);
+				expect(lines).toHaveLength(width > 0 ? 1 : 0);
+				for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+				if (width >= 12) expect(plain(lines[0] ?? "")).toMatch(/…$/);
+			}
+		} finally {
+			restore();
+		}
+	});
+
+	test("neutralizes terminal controls and bidi overrides in thinking previews", () => {
+		const restore = compactMessages(theme);
+		try {
+			const message = new AssistantMessageComponent({
+				...toolCallMessage,
+				content: [{ thinking: "Checking\tfiles\x1b]52;c;clipboard\x07\u202E", type: "thinking" }],
+			});
+			const output = message.render(80).join("\n");
+			expect(output).toContain("Checking files");
+			expect(output).not.toContain("\x1b]52;");
+			expect(output).not.toContain("\u202E");
+		} finally {
+			restore();
+		}
+	});
+
+	test("updates streaming previews and leaves assistant answers visible", () => {
+		const restore = compactMessages(theme);
+		try {
+			const message = new AssistantMessageComponent();
+			message.updateContent(
+				{
+					...toolCallMessage,
+					content: [{ thinking: "Exploring", type: "thinking" }],
+				},
+				true,
+			);
+			expect(message.render(80).map(plain)).toEqual(["󰧑 Thinking — Exploring"]);
+
+			message.updateContent(
+				{
+					...toolCallMessage,
+					content: [
+						{ thinking: "Exploring file access methods\n\nMore detail.", type: "thinking" },
+						{ text: "Here is the answer.", type: "text" },
+					],
+					stopReason: "stop",
+				},
+				false,
+			);
+			const output = message.render(80).map(plain).join("\n");
+			expect(output).toContain("󰧑 Thinking — Exploring file access methods");
+			expect(output).toContain("Here is the answer.");
+			expect(output).not.toContain("More detail.");
+		} finally {
+			restore();
+		}
+	});
+
+	test("groups adjacent thinking blocks but preserves separate runs around assistant text", () => {
+		const restore = compactMessages(theme);
+		try {
+			const message = new AssistantMessageComponent({
+				...toolCallMessage,
+				content: [
+					{ thinking: "", type: "thinking" },
+					{ thinking: "# First heading\n\nFirst details.", type: "thinking" },
+					{ thinking: "Extra adjacent details.", type: "thinking" },
+					{ text: "Progress update.", type: "text" },
+					{ thinking: "", type: "thinking" },
+					{ thinking: "Second heading\n\nSecond details.", type: "thinking" },
+				],
+			});
+			const lines = message.render(80).map(plain);
+			expect(lines.filter((line) => line.includes("Thinking"))).toEqual([
+				"󰧑 Thinking — First heading",
+				"󰧑 Thinking — Second heading",
+			]);
+			clickThinking(
+				message,
+				lines.findIndex((line) => line.includes("Second heading")),
+			);
+			const expanded = message.render(80).map(plain).join("\n");
+			expect(expanded).toContain("Second details.");
+			expect(expanded).not.toContain("First details.");
+		} finally {
+			restore();
+		}
+	});
+
+	test("expands and collapses full thinking on click, retaining expansion through updates", () => {
+		const restore = compactMessages(theme);
+		try {
+			const content = [
+				{ thinking: "Exploring file access methods\n\nFull thinking details.", type: "thinking" as const },
+			];
+			const message = new AssistantMessageComponent({ ...toolCallMessage, content });
+			clickThinking(message);
+			expect(message.render(80).map(plain).join("\n")).toContain("Full thinking details.");
+			message.updateContent({ ...toolCallMessage, content }, true);
+			message.invalidate();
+			expect(message.render(80).map(plain).join("\n")).toContain("Full thinking details.");
+			clickThinking(message);
+			expect(message.render(80).map(plain)).toEqual(["󰧑 Thinking — Exploring file access methods"]);
+
+			message.setHideThinkingBlock(true);
+			message.setHiddenThinkingLabel("");
+			expect(message.render(80)).toEqual([]);
+			message.setHideThinkingBlock(false);
+			expect(message.render(80).map(plain)).toEqual(["󰧑 Thinking — Exploring file access methods"]);
+		} finally {
+			restore();
+		}
+	});
+
+	test("restores Pi's original thinking rendering when the extension shuts down", () => {
+		const restore = compactMessages(theme);
+		new AssistantMessageComponent(toolCallMessage);
+		restore();
+		const output = new AssistantMessageComponent(toolCallMessage).render(80).map(plain).join("\n");
+		expect(output).toContain("I should inspect the files.");
+		expect(output).not.toContain("󰧑 Thinking");
 	});
 
 	test("renders an aborted operation without surrounding blank rows", () => {

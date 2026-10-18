@@ -1,5 +1,7 @@
 import { AssistantMessageComponent, type Theme, UserMessageComponent } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { Container, MouseRegion, Spacer, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
+
+import { sanitizeTerminalText } from "./layout.js";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
@@ -14,13 +16,47 @@ interface UserMessageState {
 	text: string;
 }
 
+type AssistantMessage = Parameters<AssistantMessageComponent["updateContent"]>[0];
+
 interface AssistantMessageState {
+	contentContainer: Container;
 	hiddenThinkingLabel: string;
 	hideThinkingBlock: boolean;
-	lastMessage?: {
-		content: Array<{ thinking?: string; text?: string; type: string }>;
-		errorMessage?: string;
-		stopReason: string;
+	lastMessage?: AssistantMessage;
+	thinkingVisibilityOverrides: Map<number, boolean>;
+}
+
+function thinkingRuns(message: AssistantMessage): string[] {
+	const runs: string[] = [];
+	let current: string[] = [];
+	for (const part of message.content) {
+		if (part.type === "thinking") {
+			if (part.thinking.trim()) current.push(part.thinking.trim());
+		} else if (current.length > 0) {
+			runs.push(current.join("\n\n"));
+			current = [];
+		}
+	}
+	if (current.length > 0) runs.push(current.join("\n\n"));
+	return runs;
+}
+
+function thinkingPreview(thinking: string, theme: Theme): Component {
+	const opening = thinking.trim().split(/\r?\n/, 1)[0] ?? "";
+	const summary = sanitizeTerminalText(
+		opening
+			.replace(/^#{1,6}\s+/, "")
+			.replace(/[*_`]/g, "")
+			.replace(/\s+/g, " ")
+			.trim(),
+	);
+	return {
+		render(width) {
+			const label = theme.fg("thinkingText", "󰧑 Thinking");
+			const text = `${label}${theme.fg("muted", ` — ${summary}`)}`;
+			return width > 0 ? [truncateToWidth(text, width, "…")] : [];
+		},
+		invalidate() {},
 	};
 }
 
@@ -58,13 +94,59 @@ export function compactMessages(theme: Theme): () => void {
 	};
 	UserMessageComponent.prototype.render = compactUserRender;
 
+	const originalAssistantUpdate = AssistantMessageComponent.prototype.updateContent;
+	const compactAssistantUpdate = function (
+		this: AssistantMessageComponent,
+		...args: Parameters<AssistantMessageComponent["updateContent"]>
+	): void {
+		originalAssistantUpdate.apply(this, args);
+		const { contentContainer, hideThinkingBlock, thinkingVisibilityOverrides } =
+			this as unknown as AssistantMessageState;
+		if (hideThinkingBlock) return;
+
+		const message = args[0];
+		const runs = thinkingRuns(message);
+		let runIndex = 0;
+		for (const [childIndex, child] of contentContainer.children.entries()) {
+			if (!(child instanceof MouseRegion)) continue;
+			const index = runIndex++;
+			const thinking = runs[index];
+			if (!thinking) continue;
+			// Keep Pi's per-run overrides so expansion survives streaming and invalidation.
+			const expanded = thinkingVisibilityOverrides.get(index) === false;
+			const content: Component = expanded
+				? { render: (width) => child.render(width), invalidate: () => child.invalidate() }
+				: thinkingPreview(thinking, theme);
+			contentContainer.children[childIndex] = new MouseRegion(content, (event) => {
+				if (event.type !== "click" || event.button !== "left") return undefined;
+				thinkingVisibilityOverrides.set(index, expanded);
+				this.updateContent(message);
+				return { handled: true };
+			});
+		}
+		const firstVisible = message.content.find(
+			(part) => (part.type === "thinking" && part.thinking.trim()) || (part.type === "text" && part.text.trim()),
+		);
+		if (firstVisible?.type === "thinking" && contentContainer.children[0] instanceof Spacer) {
+			contentContainer.children.shift();
+		}
+	};
+	AssistantMessageComponent.prototype.updateContent = compactAssistantUpdate;
+
 	const originalAssistantRender = AssistantMessageComponent.prototype.render;
 	const compactAssistantRender = function (this: AssistantMessageComponent, width: number): string[] {
 		const { hiddenThinkingLabel, hideThinkingBlock, lastMessage } = this as unknown as AssistantMessageState;
 		const hasToolCalls = lastMessage?.content.some((part) => part.type === "toolCall") ?? false;
 		const hasThinking = lastMessage?.content.some((part) => part.type === "thinking" && part.thinking?.trim()) ?? false;
 		const hasText = lastMessage?.content.some((part) => part.type === "text" && part.text?.trim()) ?? false;
-		if (hasToolCalls && hasThinking && !hasText && hideThinkingBlock && !hiddenThinkingLabel) return [];
+		if (
+			hasThinking &&
+			!hasText &&
+			hideThinkingBlock &&
+			!hiddenThinkingLabel &&
+			(lastMessage?.stopReason === "stop" || lastMessage?.stopReason === "toolUse")
+		)
+			return [];
 		if (lastMessage?.stopReason !== "aborted" || hasToolCalls) return originalAssistantRender.call(this, width);
 
 		const message =
@@ -81,6 +163,9 @@ export function compactMessages(theme: Theme): () => void {
 		}
 		if (UserMessageComponent.prototype.render === compactUserRender) {
 			UserMessageComponent.prototype.render = originalUserRender;
+		}
+		if (AssistantMessageComponent.prototype.updateContent === compactAssistantUpdate) {
+			AssistantMessageComponent.prototype.updateContent = originalAssistantUpdate;
 		}
 		if (AssistantMessageComponent.prototype.render === compactAssistantRender) {
 			AssistantMessageComponent.prototype.render = originalAssistantRender;
